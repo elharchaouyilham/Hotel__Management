@@ -1,17 +1,24 @@
 import config.DatabaseMigration;
+import model.Payment;
 import model.Reservation;
 import model.Room;
 import model.User;
 import model.enums.RoomStatus;
 import model.enums.RoomType;
 import model.enums.UserRole;
+import payment.CardPaymentStrategy;
+import payment.CashPaymentStrategy;
+import payment.PaymentStrategy;
+import repository.PaymentRepository;
 import repository.ReservationRepository;
 import repository.RoomRepository;
 import repository.UserRepository;
+import repository.jdbc.JdbcPaymentRepository;
 import repository.jdbc.JdbcReservationRepository;
 import repository.jdbc.JdbcRoomRepository;
 import repository.jdbc.JdbcUserRepository;
 import service.AuthService;
+import service.PaymentService;
 import service.ReservationService;
 import service.RoomService;
 
@@ -50,6 +57,12 @@ public class Main {
                         roomRepository
                 );
 
+        PaymentRepository paymentRepository =
+                new JdbcPaymentRepository();
+
+        PaymentService paymentService =
+                new PaymentService(paymentRepository);
+
         User currentUser = null;
 
         boolean running = true;
@@ -79,6 +92,7 @@ public class Main {
                                     authService,
                                     roomService,
                                     reservationService,
+                                    paymentService,
                                     currentUser
                             );
 
@@ -273,6 +287,7 @@ public class Main {
             AuthService authService,
             RoomService roomService,
             ReservationService reservationService,
+            PaymentService paymentService,
             User currentUser
     ) {
 
@@ -308,6 +323,10 @@ public class Main {
 
             System.out.println(
                     "5. Cancel my reservation"
+            );
+
+            System.out.println(
+                    "6. Make payment"
             );
 
             System.out.println(
@@ -369,6 +388,17 @@ public class Main {
 
                     cancelReservation(
                             scanner,
+                            reservationService,
+                            currentUser
+                    );
+
+                    break;
+
+                case 6:
+
+                    makePayment(
+                            scanner,
+                            paymentService,
                             reservationService,
                             currentUser
                     );
@@ -738,6 +768,124 @@ public class Main {
         }
     }
 
+    private static void makePayment(
+            Scanner scanner,
+            PaymentService paymentService,
+            ReservationService reservationService,
+            User currentUser
+    ) {
+
+        System.out.println(
+                "\n===== MAKE PAYMENT ====="
+        );
+
+        try {
+
+            System.out.print(
+                    "Reservation code: "
+            );
+
+            String code =
+                    scanner.nextLine().trim();
+
+            Reservation reservation =
+                    reservationService.getReservationByCode(
+                            currentUser,
+                            code
+                    );
+
+            System.out.println(
+                    "Reservation total: "
+                            + reservation.getTotalPrice()
+                            + " DH"
+            );
+
+            System.out.println();
+            System.out.println("1. Cash");
+            System.out.println("2. Card");
+
+            System.out.print(
+                    "Payment method: "
+            );
+
+            int choice =
+                    readSafeInt(scanner);
+
+            PaymentStrategy strategy;
+
+            switch (choice) {
+
+                case 1:
+
+                    strategy =
+                            new CashPaymentStrategy();
+
+                    break;
+
+                case 2:
+
+                    strategy =
+                            new CardPaymentStrategy();
+
+                    break;
+
+                default:
+
+                    System.out.println(
+                            "Invalid payment method."
+                    );
+
+                    return;
+            }
+
+            Payment payment =
+                    paymentService.makePayment(
+                            currentUser.getId(),
+                            reservation.getId(),
+                            reservation.getTotalPrice(),
+                            strategy
+                    );
+
+            System.out.println();
+            System.out.println(
+                    "Payment successful!"
+            );
+
+            System.out.println(
+                    "Payment ID: "
+                            + payment.getId()
+            );
+
+            System.out.println(
+                    "Reservation ID: "
+                            + payment.getReservationId()
+            );
+
+            System.out.println(
+                    "Amount: "
+                            + payment.getAmount()
+                            + " DH"
+            );
+
+            System.out.println(
+                    "Status: "
+                            + payment.getStatus()
+            );
+
+            System.out.println(
+                    "Date: "
+                            + payment.getPaymentDate()
+            );
+
+        } catch (RuntimeException e) {
+
+            System.out.println(
+                    "\nError: "
+                            + e.getMessage()
+            );
+        }
+    }
+
     private static boolean adminMenu(
             Scanner scanner,
             AuthService authService,
@@ -987,21 +1135,29 @@ public class Main {
             switch (typeChoice) {
 
                 case 1:
+
                     type = RoomType.SINGLE;
+
                     break;
 
                 case 2:
+
                     type = RoomType.DOUBLE;
+
                     break;
 
                 case 3:
+
                     type = RoomType.SUITE;
+
                     break;
 
                 default:
+
                     System.out.println(
                             "Invalid room type."
                     );
+
                     return;
             }
 

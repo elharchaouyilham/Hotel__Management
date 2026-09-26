@@ -22,7 +22,7 @@ public class DatabaseConnection {
         return instance;
     }
 
-    public Connection getConnection() {
+    public static Connection getConnection() {
 
         try {
             return DriverManager.getConnection(
